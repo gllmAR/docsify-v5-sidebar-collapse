@@ -1,17 +1,36 @@
 /*
- * docsify-sidebar-collapse (Docsify v5)
- * ---------------------------------
- * Drop‑in Docsify plugin that turns the default flat sidebar into a
- * collapsible tree. All folders are collapsed by default.
- *
- * Optional per‑site overrides can be set from `window.$docsify.sidebarCollapse`:
- *   {
- *     openLevel     : 1,      // auto‑expand headings ≤ this depth (default 1)
- *     persist       : true,   // remember open branches in sessionStorage
- *     scrollIntoView: true    // keep the active link centred
+ * Docsify v5 Sidebar Collapse Plugin
+ * ==================================
+ * 
+ * A modern, lightweight plugin that transforms Docsify's flat sidebar
+ * into a collapsible tree navigation with smart auto-expansion.
+ * 
+ * Features:
+ * - Collapsible navigation folders
+ * - Auto-expansion to show current page location
+ * - Persistent state across sessions
+ * - Configurable depth levels
+ * - Smooth animations
+ * 
+ * Usage:
+ *   <script src="./docsify-v5-sidebar-collapse.js"></script>
+ * 
+ * Configuration (optional):
+ *   window.$docsify.sidebarCollapse = {
+ *     openLevel: 2,           // Auto-expand folders ≤ this depth
+ *     persist: true,          // Remember state in sessionStorage
+ *     scrollIntoView: true    // Scroll active item into view
  *   }
+ * 
+ * @version 1.0.0
+ * @author Your Name
+ * @license MIT
  */
 
+/**
+ * CSS styles for the sidebar collapse functionality
+ * Creates visual indicators and controls visibility of nested elements
+ */
 const CSS = `
 .sidebar-nav li > ul {
   display: none;
@@ -26,6 +45,8 @@ const CSS = `
   margin-right: .25em;
   transition: transform .2s ease;
   cursor: pointer;
+  padding: 2px;
+  margin-left: -2px;
 }
 .sidebar-nav li.open.folder > a::before {
   transform: rotate(90deg);
@@ -35,7 +56,10 @@ const CSS = `
 }
 `;
 
-/** Inject a <style> once */
+/**
+ * Inject CSS styles into the document head
+ * Only injects once, even if called multiple times
+ */
 function injectStyle() {
   if (document.getElementById('dsc-style')) return;
   const style = document.createElement('style');
@@ -44,6 +68,11 @@ function injectStyle() {
   document.head.appendChild(style);
 }
 
+/**
+ * Get configuration options from Docsify config
+ * Merges user options with sensible defaults
+ * @returns {Object} Configuration object
+ */
 function getOpts() {
   const d = (window.$docsify = window.$docsify || {});
   const user = d.sidebarCollapse || {};
@@ -55,7 +84,11 @@ function getOpts() {
   };
 }
 
-/** Expand ancestors to show current page location and auto-expand by openLevel */
+/**
+ * Expand ancestors to show current page location and auto-expand by openLevel
+ * This ensures users can see where they are in the navigation hierarchy
+ * @param {Object} opts - Configuration options
+ */
 function openToActive(opts) {
   const active = document.querySelector('.sidebar-nav .active');
   
@@ -79,7 +112,11 @@ function openToActive(opts) {
   }
 }
 
-/** Auto-expand folders up to a certain depth level */
+/**
+ * Auto-expand folders up to a certain depth level
+ * @param {number} maxLevel - Maximum depth to auto-expand
+ * @param {boolean} persist - Whether to save state to sessionStorage
+ */
 function expandByLevel(maxLevel, persist = false) {
   const root = document.querySelector('.sidebar-nav');
   if (!root) return;
@@ -103,12 +140,18 @@ function expandByLevel(maxLevel, persist = false) {
   });
 }
 
+/**
+ * Restore previously saved expand/collapse state from sessionStorage
+ */
 function restoreState() {
   document
     .querySelectorAll('.sidebar-nav li[data-opened="1"]')
     .forEach((li) => li.classList.add('open'));
 }
 
+/**
+ * Save current expand/collapse state to sessionStorage
+ */
 function saveState() {
   const opened = Array.from(
     document.querySelectorAll('.sidebar-nav li.open')
@@ -116,6 +159,9 @@ function saveState() {
   sessionStorage.setItem('dsc-open', JSON.stringify(opened));
 }
 
+/**
+ * Apply stored state attributes to sidebar elements
+ */
 function applyPersistAttr() {
   const stored = JSON.parse(sessionStorage.getItem('dsc-open') || '[]');
   stored.forEach((path) => {
@@ -124,6 +170,11 @@ function applyPersistAttr() {
   });
 }
 
+/**
+ * Main function that enhances the sidebar with collapse functionality
+ * @param {Object} hook - Docsify hook object
+ * @param {Object} vm - Docsify VM instance
+ */
 function enhanceSidebar(hook, vm) {
   const opts = getOpts();
   injectStyle();
@@ -167,20 +218,28 @@ function enhanceSidebar(hook, vm) {
       const li = link.parentElement;
       if (!li.classList.contains('folder')) return;
       
-      // Prevent navigation for folder links
-      ev.preventDefault();
-      ev.stopPropagation();
+      // Check if click was on the triangle (::before pseudo-element)
+      // We detect this by checking if the click was in the left margin area
+      const rect = link.getBoundingClientRect();
+      const clickX = ev.clientX - rect.left;
       
-      li.classList.toggle('open');
-      if (opts.persist) {
-        li.dataset.opened = li.classList.contains('open') ? '1' : '0';
-        saveState();
+      // If clicked on triangle area (first ~20px), toggle folder
+      if (clickX <= 20) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        
+        li.classList.toggle('open');
+        if (opts.persist) {
+          li.dataset.opened = li.classList.contains('open') ? '1' : '0';
+          saveState();
+        }
       }
+      // Otherwise, let the link navigate normally
     });
   });
 }
 
-// Self‑register when imported as a side‑effect
+// Self-register when imported as a side-effect
 if (typeof window !== 'undefined') {
   window.$docsify = window.$docsify || {};
   (window.$docsify.plugins = window.$docsify.plugins || []).push(enhanceSidebar);
