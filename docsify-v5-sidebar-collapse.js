@@ -55,21 +55,52 @@ function getOpts() {
   };
 }
 
-/** Expand ancestors and (optionally) all nodes ≤ opts.openLevel */
+/** Expand ancestors to show current page location and auto-expand by openLevel */
 function openToActive(opts) {
   const active = document.querySelector('.sidebar-nav .active');
-  if (!active) return;
   
-  let li = active.closest('li');
-  while (li) {
-    li.classList.add('open');
-    if (opts.persist) li.dataset.opened = '1';
-    li = li.parentElement.closest('li');
+  // First, expand all ancestors of the active page to show where user is
+  if (active) {
+    let li = active.closest('li');
+    while (li) {
+      li.classList.add('open');
+      if (opts.persist) li.dataset.opened = '1';
+      li = li.parentElement.closest('li');
+    }
+    
+    if (opts.scrollIntoView) {
+      active.scrollIntoView({ block: 'center' });
+    }
   }
   
-  if (opts.scrollIntoView) {
-    active.scrollIntoView({ block: 'center' });
+  // Then, auto-expand folders based on openLevel setting
+  if (opts.openLevel > 0) {
+    expandByLevel(opts.openLevel, opts.persist);
   }
+}
+
+/** Auto-expand folders up to a certain depth level */
+function expandByLevel(maxLevel, persist = false) {
+  const root = document.querySelector('.sidebar-nav');
+  if (!root) return;
+  
+  function getDepth(li) {
+    let depth = 0;
+    let parent = li.parentElement;
+    while (parent && parent !== root) {
+      if (parent.tagName === 'UL') depth++;
+      parent = parent.parentElement;
+    }
+    return depth;
+  }
+  
+  root.querySelectorAll('li.folder').forEach((li) => {
+    const depth = getDepth(li);
+    if (depth < maxLevel) {
+      li.classList.add('open');
+      if (persist) li.dataset.opened = '1';
+    }
+  });
 }
 
 function restoreState() {
@@ -110,9 +141,17 @@ function enhanceSidebar(hook, vm) {
         const a = li.querySelector('a');
         if (a) li.dataset.path = a.getAttribute('href');
       }
+      
+      // Ensure all folders start collapsed (except those that will be opened)
+      if (hasChildren) {
+        li.classList.remove('open');
+      }
     });
 
+    // Apply persistence state first
     if (opts.persist) applyPersistAttr();
+    
+    // Then expand to show current location and apply openLevel
     openToActive(opts);
   });
 
